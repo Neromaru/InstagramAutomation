@@ -12,6 +12,7 @@ from image_formatter import create_post
 
 
 class InstagramUploader:
+    
     # Emulate mobile from a Google Chrome
     mobile_emulation = {
 
@@ -23,12 +24,14 @@ class InstagramUploader:
              AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"
     }
     chrome_options = Options()
+    chrome_options.add_argument('--headless')
     chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
 
     def __init__(self, username, password, file_path):
         self.keybord = Controller()
         self.driver = webdriver.Chrome(chrome_options=self.chrome_options,
-                                       executable_path=os.path.join(os.path.curdir, 'chromedriver')
+                                       executable_path=os.path.join(
+                                           os.path.curdir, 'chromedriver')
                                        )
         self.path = file_path
         self.username = username
@@ -55,6 +58,7 @@ class InstagramUploader:
     def _login(self):
         self.driver.get(self.login_page)
         self.wait_for(By.NAME, 'username')
+
         # Find form elements
         username = self.driver.find_element_by_name('username')
         password = self.driver.find_element_by_name('password')
@@ -66,6 +70,7 @@ class InstagramUploader:
         submit.click()
 
     def _create_new_post(self, image, text):
+
         # close popups of Instagram
         if self.wait_for(By.CLASS_NAME, 'GAMXX'):
             self.driver.find_element_by_xpath('//main/div/button').click()
@@ -73,7 +78,7 @@ class InstagramUploader:
             self.driver.find_element_by_class_name('HoLwm').click()
 
         inputs = self.driver.find_elements_by_xpath('//input[@type="file"]')
-        poster = self.driver.find_element_by_xpath('//span[@aria-label="New Post"]')
+        poster = self.driver.find_element_by_xpath('//div[@class="q02Nz _0TPg"]')
         poster.click()
 
         # Pass file to needed inputs
@@ -82,6 +87,7 @@ class InstagramUploader:
                 input.send_keys(image)
             except StaleElementReferenceException:
                 continue
+
         # This is done to close the open file window
         self.keybord.press(Key.esc)
         self.keybord.release(Key.esc)
