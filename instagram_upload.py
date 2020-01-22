@@ -12,7 +12,7 @@ from image_formatter import create_post
 
 
 class InstagramUploader:
-    
+
     # Emulate mobile from a Google Chrome
     mobile_emulation = {
 
