@@ -1,38 +1,40 @@
 import os
+import time
 
 from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException
 from selenium.common.exceptions import TimeoutException, StaleElementReferenceException
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.firefox.options import Options, FirefoxProfile
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-from pynput.keyboard import Key, Controller
 
 from image_formatter import create_post
 
+skip_profile = 2
+
+
+def caps():
+    profile = FirefoxProfile()
+    profile.set_preference("general.useragent.override",
+                           "Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1")
+    profile.set_preference("intl.accept_languages", 'en-us')
+    return profile
+
 
 class InstagramUploader:
+    # Emulate mobile from a Firefox
 
-    # Emulate mobile from a Google Chrome
-    mobile_emulation = {
-
-        "deviceMetrics": {
-            "width": 360, "height": 640, "pixelRatio": 3.0
-        },
-        "userAgent":
-            "Mozilla/5.0 (Linux; Android 4.2.1; en-us; Nexus 5 Build/JOP40D) \
-             AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"
-    }
-    chrome_options = Options()
-    chrome_options.add_argument('--headless')
-    chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
+    options = Options()
+    options.headless = False
 
     def __init__(self, username, password, file_path):
-        self.keybord = Controller()
-        self.driver = webdriver.Chrome(chrome_options=self.chrome_options,
-                                       executable_path=os.path.join(
-                                           os.path.curdir, 'chromedriver')
-                                       )
+        self.driver = webdriver.Firefox(options=self.options,
+                                        firefox_profile=caps(),
+                                        executable_path=os.path.join(
+                                            os.path.curdir, 'geckodriver'),
+                                        )
+        self.driver.implicitly_wait(3)
         self.path = file_path
         self.username = username
         self.password = password
@@ -43,6 +45,7 @@ class InstagramUploader:
         image, post = create_post(self.path)
         self._create_new_post(image, post)
         os.remove(image)
+        self.driver.close()
 
     def wait_for(self, by, value):
         """
@@ -69,8 +72,16 @@ class InstagramUploader:
         password.send_keys(self.password)
         submit.click()
 
-    def _create_new_post(self, image, text):
+    def find_poster(self):
+        svgs = self.driver.find_elements_by_tag_name('svg')
+        for element in svgs:
+            label = element.get_attribute('aria-label') == 'New Post'
+            if label:
+                return element
+        raise NoSuchElementException
 
+    def _create_new_post(self, image, text):
+        time.sleep(2)
         # close popups of Instagram
         if self.wait_for(By.CLASS_NAME, 'GAMXX'):
             self.driver.find_element_by_xpath('//main/div/button').click()
@@ -78,19 +89,16 @@ class InstagramUploader:
             self.driver.find_element_by_class_name('HoLwm').click()
 
         inputs = self.driver.find_elements_by_xpath('//input[@type="file"]')
-        poster = self.driver.find_element_by_xpath('//div[@class="q02Nz _0TPg"]')
-        poster.click()
 
+        poster = self.find_poster()
+        poster.click()
         # Pass file to needed inputs
-        for input in inputs:
+
+        for input in inputs[skip_profile:]:
             try:
                 input.send_keys(image)
             except StaleElementReferenceException:
                 continue
-
-        # This is done to close the open file window
-        self.keybord.press(Key.esc)
-        self.keybord.release(Key.esc)
 
         # Set active window of browser instead of file browser
         self.wait_for(By.CLASS_NAME, "UP43G")
@@ -105,4 +113,7 @@ class InstagramUploader:
             self.driver.find_element_by_xpath('//button[@class="UP43G"]').click()
 
     def run(self):
-        return self._run()
+        try:
+            return self._run()
+        finally:
+            self.driver.close()
